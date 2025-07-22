@@ -1,188 +1,188 @@
 # TcpUdpGem
 
-一个为Open 3D Engine (O3DE) 提供TCP和UDP网络通信功能的Gem。
+A Gem that provides TCP and UDP network communication functionality for Open 3D Engine (O3DE).
 
-## 功能特性
+## Features
 
-- **UDP通信**：支持UDP消息发送和接收
-- **UDP组播**：支持加入/离开组播组和组播消息发送
-- **TCP通信**：支持TCP客户端和服务器模式
-- **事件驱动**：基于O3DE的EBus系统进行事件通知
-- **脚本支持**：所有功能都可以在脚本中使用
-- **跨平台**：支持Windows、Linux、Mac等平台
+- **UDP Communication**: Support for UDP message sending and receiving
+- **UDP Multicast**: Support for joining/leaving multicast groups and sending multicast messages
+- **TCP Communication**: Support for TCP client and server modes
+- **Event-Driven**: Event notifications based on O3DE's EBus system
+- **Script Support**: All functionality can be used in scripts
+- **Cross-Platform**: Support for Windows, Linux, Mac and other platforms
 
-## 安装
+## Installation
 
-1. 将此Gem复制到你的O3DE项目的`Gems`目录中
-2. 在项目的`project.json`文件中添加此Gem的引用
-3. 重新生成项目文件并编译
+1. Copy this Gem to the `Gems` directory of your O3DE project
+2. Add a reference to this Gem in your project's `project.json` file
+3. Regenerate project files and compile
 
-## 组件说明
+## Component Description
 
 ### UdpComponent
 
-UDP网络通信组件，提供UDP消息发送、接收和组播功能。
+UDP network communication component that provides UDP message sending, receiving, and multicast functionality.
 
-#### 主要方法
+#### Main Methods
 
-- `Open(port)` - 打开UDP套接字并绑定到指定端口
-- `Close()` - 关闭UDP套接字
-- `Send(ip, port, message)` - 发送UDP消息到指定地址
-- `SetReceiveCallback(callback)` - 设置消息接收回调函数
-- `JoinMulticastGroup(multicastAddress)` - 加入组播组
-- `LeaveMulticastGroup(multicastAddress)` - 离开组播组
-- `SendMulticast(multicastAddress, port, message)` - 发送组播消息
+- `Open(port)` - Open UDP socket and bind to specified port
+- `Close()` - Close UDP socket
+- `Send(ip, port, message)` - Send UDP message to specified address
+- `SetReceiveCallback(callback)` - Set message receive callback function
+- `JoinMulticastGroup(multicastAddress)` - Join multicast group
+- `LeaveMulticastGroup(multicastAddress)` - Leave multicast group
+- `SendMulticast(multicastAddress, port, message)` - Send multicast message
 
-#### 事件通知
+#### Event Notifications
 
-- `OnMessageReceived(senderIp, senderPort, message)` - 接收到UDP消息时触发
+- `OnMessageReceived(senderIp, senderPort, message)` - Triggered when UDP message is received
 
 ### TcpComponent
 
-TCP网络通信组件，支持客户端和服务器模式。
+TCP network communication component that supports client and server modes.
 
-#### 主要方法
+#### Main Methods
 
-- `Listen(port)` - 启动TCP服务器，监听指定端口
-- `Connect(ip, port)` - 连接到TCP服务器
-- `Disconnect()` - 断开TCP连接
-- `IsConnected()` - 检查连接状态
-- `Send(message)` - 发送TCP消息
-- `SetReceiveCallback(callback)` - 设置消息接收回调函数
+- `Listen(port)` - Start TCP server and listen on specified port
+- `Connect(ip, port)` - Connect to TCP server
+- `Disconnect()` - Disconnect TCP connection
+- `IsConnected()` - Check connection status
+- `Send(message)` - Send TCP message
+- `SetReceiveCallback(callback)` - Set message receive callback function
 
-#### 事件通知
+#### Event Notifications
 
-- `OnConnected()` - 连接建立时触发
-- `OnDisconnected()` - 连接断开时触发
-- `OnConnectionFailed()` - 连接失败时触发
-- `OnMessageReceived(message)` - 接收到TCP消息时触发
+- `OnConnected()` - Triggered when connection is established
+- `OnDisconnected()` - Triggered when connection is disconnected
+- `OnConnectionFailed()` - Triggered when connection fails
+- `OnMessageReceived(message)` - Triggered when TCP message is received
 
-## 使用示例
+## Usage Examples
 
-### UDP通信示例
+### UDP Communication Example
 
-#### C++代码
+#### C++ Code
 
 ```cpp
-// 获取UdpComponent
+// Get UdpComponent
 AZ::Entity* entity = GetEntity();
 UdpComponent* udpComponent = entity->FindComponent<UdpComponent>();
 
-// 打开UDP套接字
+// Open UDP socket
 udpComponent->Open(8080);
 
-// 设置接收回调
+// Set receive callback
 udpComponent->SetReceiveCallback([](const AZStd::string& senderIp, AZ::u16 senderPort, const AZStd::string& message) {
     AZ_Printf("UDP", "Received from %s:%d: %s", senderIp.c_str(), senderPort, message.c_str());
 });
 
-// 发送消息
+// Send message
 udpComponent->Send("192.168.1.100", 8081, "Hello UDP!");
 
-// 加入组播组
+// Join multicast group
 udpComponent->JoinMulticastGroup("224.0.0.1");
 
-// 发送组播消息
+// Send multicast message
 udpComponent->SendMulticast("224.0.0.1", 8082, "Hello Multicast!");
 ```
 
-#### 脚本代码 (Lua)
+#### Script Code (Lua)
 
 ```lua
--- 获取UdpComponent
+-- Get UdpComponent
 local udpRequestBus = UdpRequestBus.Connect(self, self.entityId)
 
--- 打开UDP套接字
+-- Open UDP socket
 udpRequestBus:Open(8080)
 
--- 设置接收回调
+-- Set receive callback
 udpRequestBus:SetReceiveCallback(function(senderIp, senderPort, message)
     Debug.Log("Received from " .. senderIp .. ":" .. senderPort .. ": " .. message)
 end)
 
--- 发送消息
+-- Send message
 udpRequestBus:Send("192.168.1.100", 8081, "Hello UDP!")
 
--- 加入组播组
+-- Join multicast group
 udpRequestBus:JoinMulticastGroup("224.0.0.1")
 
--- 发送组播消息
+-- Send multicast message
 udpRequestBus:SendMulticast("224.0.0.1", 8082, "Hello Multicast!")
 ```
 
-### TCP通信示例
+### TCP Communication Example
 
-#### TCP服务器
+#### TCP Server
 
 ```cpp
-// 获取TcpComponent
+// Get TcpComponent
 AZ::Entity* entity = GetEntity();
 TcpComponent* tcpComponent = entity->FindComponent<TcpComponent>();
 
-// 启动TCP服务器
+// Start TCP server
 tcpComponent->Listen(9090);
 
-// 设置接收回调
+// Set receive callback
 tcpComponent->SetReceiveCallback([](const AZStd::string& message) {
     AZ_Printf("TCP Server", "Received: %s", message.c_str());
 });
 
-// 发送响应消息
+// Send response message
 tcpComponent->Send("Hello from server!");
 ```
 
-#### TCP客户端
+#### TCP Client
 
 ```cpp
-// 获取TcpComponent
+// Get TcpComponent
 AZ::Entity* entity = GetEntity();
 TcpComponent* tcpComponent = entity->FindComponent<TcpComponent>();
 
-// 连接到TCP服务器
+// Connect to TCP server
 if (tcpComponent->Connect("192.168.1.100", 9090))
 {
-    // 设置接收回调
+    // Set receive callback
     tcpComponent->SetReceiveCallback([](const AZStd::string& message) {
         AZ_Printf("TCP Client", "Received: %s", message.c_str());
     });
     
-    // 发送消息
+    // Send message
     tcpComponent->Send("Hello from client!");
 }
 ```
 
-#### 脚本代码 (Lua)
+#### Script Code (Lua)
 
 ```lua
--- TCP服务器
+-- TCP Server
 local tcpRequestBus = TcpRequestBus.Connect(self, self.entityId)
 
--- 启动服务器
+-- Start server
 tcpRequestBus:Listen(9090)
 
--- 设置接收回调
+-- Set receive callback
 tcpRequestBus:SetReceiveCallback(function(message)
     Debug.Log("TCP Server received: " .. message)
 end)
 
--- TCP客户端
+-- TCP Client
 local tcpRequestBus = TcpRequestBus.Connect(self, self.entityId)
 
--- 连接到服务器
+-- Connect to server
 if tcpRequestBus:Connect("192.168.1.100", 9090) then
-    -- 设置接收回调
+    -- Set receive callback
     tcpRequestBus:SetReceiveCallback(function(message)
         Debug.Log("TCP Client received: " .. message)
     end)
     
-    -- 发送消息
+    -- Send message
     tcpRequestBus:Send("Hello from client!")
 end
 ```
 
-## 事件处理
+## Event Handling
 
-### UDP事件处理
+### UDP Event Handling
 
 ```cpp
 class MyUdpHandler : public UdpNotificationBus::Handler
@@ -194,12 +194,12 @@ public:
     }
 };
 
-// 连接事件总线
+// Connect to event bus
 MyUdpHandler handler;
 handler.BusConnect(entityId);
 ```
 
-### TCP事件处理
+### TCP Event Handling
 
 ```cpp
 class MyTcpHandler : public TcpNotificationBus::Handler
@@ -226,56 +226,56 @@ public:
     }
 };
 
-// 连接事件总线
+// Connect to event bus
 MyTcpHandler handler;
 handler.BusConnect(entityId);
 ```
 
-## 注意事项
+## Important Notes
 
-1. **端口占用**：确保使用的端口没有被其他应用程序占用
-2. **防火墙设置**：确保防火墙允许相应端口的网络通信
-3. **组播地址**：组播地址范围通常是224.0.0.0到239.255.255.255
-4. **错误处理**：建议在生产环境中添加适当的错误处理和重连机制
-5. **性能考虑**：大量数据传输时考虑使用缓冲和批处理
+1. **Port Usage**: Ensure the ports you use are not occupied by other applications
+2. **Firewall Settings**: Ensure the firewall allows network communication on the corresponding ports
+3. **Multicast Addresses**: Multicast address range is typically 224.0.0.0 to 239.255.255.255
+4. **Error Handling**: It's recommended to add appropriate error handling and reconnection mechanisms in production environments
+5. **Performance Considerations**: Consider using buffering and batch processing for large data transfers
 
-## 故障排除
+## Troubleshooting
 
-### 常见问题
+### Common Issues
 
-1. **无法绑定端口**
-   - 检查端口是否已被占用
-   - 确认有足够的权限绑定端口
-   - 尝试使用其他端口
+1. **Cannot bind port**
+   - Check if the port is already in use
+   - Confirm you have sufficient permissions to bind the port
+   - Try using a different port
 
-2. **无法接收消息**
-   - 检查防火墙设置
-   - 确认网络连接正常
-   - 验证IP地址和端口配置
+2. **Cannot receive messages**
+   - Check firewall settings
+   - Confirm network connection is normal
+   - Verify IP address and port configuration
 
-3. **组播不工作**
-   - 检查网络是否支持组播
-   - 确认组播地址在有效范围内
-   - 检查路由器组播设置
+3. **Multicast not working**
+   - Check if the network supports multicast
+   - Confirm multicast address is in valid range
+   - Check router multicast settings
 
-4. **TCP连接失败**
-   - 确认服务器正在监听
-   - 检查IP地址和端口是否正确
-   - 验证网络连通性
+4. **TCP connection failed**
+   - Confirm server is listening
+   - Check if IP address and port are correct
+   - Verify network connectivity
 
-## 许可证
+## License
 
-本项目遵循Apache 2.0或MIT许可证。详见LICENSE文件。
+This project follows the Apache 2.0 or MIT license. See LICENSE file for details.
 
-## 贡献
+## Contributing
 
-欢迎提交问题报告和功能请求。如果你想贡献代码，请先创建一个issue讨论你的想法。
+Welcome to submit issue reports and feature requests. If you want to contribute code, please create an issue first to discuss your ideas.
 
-## 版本历史
+## Version History
 
-- **v1.0.0** - 初始版本
-  - UDP消息发送和接收
-  - UDP组播支持
-  - TCP客户端和服务器
-  - 事件驱动架构
-  - 脚本支持
+- **v1.0.0** - Initial version
+  - UDP message sending and receiving
+  - UDP multicast support
+  - TCP client and server
+  - Event-driven architecture
+  - Script support
