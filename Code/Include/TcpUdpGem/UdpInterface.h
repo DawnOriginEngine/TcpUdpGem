@@ -15,6 +15,9 @@ namespace TcpUdpGem
         virtual void Send(const AZStd::string& ip, AZ::u16 port, const AZStd::string& message) = 0;
         virtual void SetReceiveCallback(AZStd::function<void(const AZStd::string&, AZ::u16, const AZStd::string&)> callback) = 0;
 
+        virtual bool JoinMulticastGroup(const AZStd::string& multicastAddress) = 0;
+        virtual bool LeaveMulticastGroup(const AZStd::string& multicastAddress) = 0;
+        virtual void SendMulticast(const AZStd::string& multicastAddress, AZ::u16 port, const AZStd::string& message) = 0;
     };
 
     class UdpNotifications

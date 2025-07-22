@@ -10,6 +10,7 @@
 #include <AzCore/Component/TickBus.h>
 #include <AzCore/std/functional.h>
 #include <AzCore/std/containers/array.h>
+#include <AzCore/std/containers/set.h>
 
 namespace TcpUdpGem
 {
@@ -31,6 +32,10 @@ namespace TcpUdpGem
 
         void Send(const AZStd::string& ip, AZ::u16 port, const AZStd::string& message) override;
         void SetReceiveCallback(AZStd::function<void(const AZStd::string&, AZ::u16, const AZStd::string&)> callback) override;
+        
+        bool JoinMulticastGroup(const AZStd::string& multicastAddress) override;
+        bool LeaveMulticastGroup(const AZStd::string& multicastAddress) override;
+        void SendMulticast(const AZStd::string& multicastAddress, AZ::u16 port, const AZStd::string& message) override;
     
     protected:
         void Activate() override;
@@ -46,6 +51,9 @@ namespace TcpUdpGem
          AZStd::array<uint8_t, MaxReceiveBufferSize> m_receiveBuffer;
 
          AZStd::function<void(const AZStd::string&, AZ::u16, const AZStd::string&)> m_receiveCallback;
+         
+         // 组播组管理
+         AZStd::set<AZStd::string> m_joinedMulticastGroups;
  
          AZ::u16 m_port = 9000;
     };

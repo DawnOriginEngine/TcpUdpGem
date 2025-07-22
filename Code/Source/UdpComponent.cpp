@@ -7,6 +7,21 @@
 #include <AzNetworking/Utilities/IpAddress.h>
 #include <AzNetworking/UdpTransport/DtlsEndpoint.h>
 #include <AzNetworking/ConnectionLayer/IConnection.h>
+#include <AzCore/Console/ILogger.h>
+
+// 平台相关的头文件用于组播
+#ifdef AZ_PLATFORM_WINDOWS
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#elif defined(AZ_PLATFORM_LINUX) || defined(AZ_PLATFORM_ANDROID)
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#elif defined(AZ_PLATFORM_MAC) || defined(AZ_PLATFORM_IOS)
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#endif
 
 namespace TcpUdpGem
 {
@@ -28,7 +43,14 @@ namespace TcpUdpGem
 
     void UdpComponent::Deactivate()
     {
-        if (m_udpSocket->IsOpen())
+        // 离开所有已加入的组播组
+        for (const auto& multicastAddress : m_joinedMulticastGroups)
+        {
+            LeaveMulticastGroup(multicastAddress);
+        }
+        m_joinedMulticastGroups.clear();
+        
+        if (m_udpSocket && m_udpSocket->IsOpen())
         {
             m_udpSocket->Close();
             m_udpSocket.reset();
@@ -73,7 +95,11 @@ namespace TcpUdpGem
                 ->Handler<UdpNotificationBusHandler>();
             
             behaviorContext->EBus<UdpRequestBus>("UdpRequestBus")
-                ->Event("Send", &UdpRequestBus::Events::Send);
+                ->Event("Send", &UdpRequestBus::Events::Send)
+                ->Event("SetReceiveCallback", &UdpRequestBus::Events::SetReceiveCallback)
+                ->Event("JoinMulticastGroup", &UdpRequestBus::Events::JoinMulticastGroup)
+                ->Event("LeaveMulticastGroup", &UdpRequestBus::Events::LeaveMulticastGroup)
+                ->Event("SendMulticast", &UdpRequestBus::Events::SendMulticast);
         }
     }
 
@@ -167,5 +193,137 @@ namespace TcpUdpGem
         AZ::u16 senderPort = senderAddress.GetPort(AzNetworking::ByteOrder::Network);
         
         UdpNotificationBus::Event(GetEntityId(), &UdpNotificationBus::Events::OnMessageReceived, senderIp, senderPort, message);
+    }
+    
+    bool UdpComponent::JoinMulticastGroup(const AZStd::string& multicastAddress)
+    {
+        if (!m_udpSocket || !m_udpSocket->IsOpen())
+        {
+            AZ_Warning("UdpComponent", false, "UDP socket is not open");
+            return false;
+        }
+        
+        // 检查是否是有效的组播地址
+        AzNetworking::IpAddress multicastIp(multicastAddress.c_str(), static_cast<uint16_t>(0), AzNetworking::ProtocolType::Udp);
+        if (!multicastIp.IsValid())
+        {
+            AZ_Error("UdpComponent", false, "Invalid multicast address: %s", multicastAddress.c_str());
+            return false;
+        }
+        
+        // 检查是否已经加入了这个组播组
+        if (m_joinedMulticastGroups.find(multicastAddress) != m_joinedMulticastGroups.end())
+        {
+            AZ_Warning("UdpComponent", false, "Already joined multicast group: %s", multicastAddress.c_str());
+            return true;
+        }
+        
+        // 获取socket文件描述符
+        auto socketFd = m_udpSocket->GetSocketFd();
+        
+#ifdef AZ_PLATFORM_WINDOWS
+        struct ip_mreq mreq;
+        inet_pton(AF_INET, multicastAddress.c_str(), &mreq.imr_multiaddr);
+        mreq.imr_interface.s_addr = INADDR_ANY;
+        
+        if (setsockopt(static_cast<SOCKET>(socketFd), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0)
+        {
+            AZ_Error("UdpComponent", false, "Failed to join multicast group %s", multicastAddress.c_str());
+            return false;
+        }
+#else
+        struct ip_mreq mreq;
+        mreq.imr_multiaddr.s_addr = inet_addr(multicastAddress.c_str());
+        mreq.imr_interface.s_addr = INADDR_ANY;
+        
+        if (setsockopt(static_cast<int>(socketFd), IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
+        {
+            AZ_Error("UdpComponent", false, "Failed to join multicast group %s", multicastAddress.c_str());
+            return false;
+        }
+#endif
+        
+        m_joinedMulticastGroups.insert(multicastAddress);
+        AZ_TracePrintf("UdpComponent", "Successfully joined multicast group: %s", multicastAddress.c_str());
+        return true;
+    }
+    
+    bool UdpComponent::LeaveMulticastGroup(const AZStd::string& multicastAddress)
+    {
+        if (!m_udpSocket || !m_udpSocket->IsOpen())
+        {
+            AZ_Warning("UdpComponent", false, "UDP socket is not open");
+            return false;
+        }
+        
+        // 检查是否已经加入了这个组播组
+        auto it = m_joinedMulticastGroups.find(multicastAddress);
+        if (it == m_joinedMulticastGroups.end())
+        {
+            AZ_Warning("UdpComponent", false, "Not a member of multicast group: %s", multicastAddress.c_str());
+            return false;
+        }
+        
+        // 获取socket文件描述符
+        auto socketFd = m_udpSocket->GetSocketFd();
+        
+#ifdef AZ_PLATFORM_WINDOWS
+        struct ip_mreq mreq;
+        inet_pton(AF_INET, multicastAddress.c_str(), &mreq.imr_multiaddr);
+        mreq.imr_interface.s_addr = INADDR_ANY;
+        
+        if (setsockopt(static_cast<SOCKET>(socketFd), IPPROTO_IP, IP_DROP_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0)
+        {
+            AZ_Error("UdpComponent", false, "Failed to leave multicast group %s", multicastAddress.c_str());
+            return false;
+        }
+#else
+        struct ip_mreq mreq;
+        mreq.imr_multiaddr.s_addr = inet_addr(multicastAddress.c_str());
+        mreq.imr_interface.s_addr = INADDR_ANY;
+        
+        if (setsockopt(static_cast<int>(socketFd), IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
+        {
+            AZ_Error("UdpComponent", false, "Failed to leave multicast group %s", multicastAddress.c_str());
+            return false;
+        }
+#endif
+        
+        m_joinedMulticastGroups.erase(it);
+        AZ_TracePrintf("UdpComponent", "Successfully left multicast group: %s", multicastAddress.c_str());
+        return true;
+    }
+    
+    void UdpComponent::SendMulticast(const AZStd::string& multicastAddress, AZ::u16 port, const AZStd::string& message)
+    {
+        if (!m_udpSocket || !m_udpSocket->IsOpen())
+        {
+            AZ_Warning("UdpComponent", false, "UDP socket is not open");
+            return;
+        }
+        
+        // 验证组播地址
+        AzNetworking::IpAddress targetAddress(multicastAddress.c_str(), port, AzNetworking::ProtocolType::Udp);
+        if (!targetAddress.IsValid())
+        {
+            AZ_Error("UdpComponent", false, "Invalid multicast address: %s:%d", multicastAddress.c_str(), port);
+            return;
+        }
+        
+        const uint8_t* data = reinterpret_cast<const uint8_t*>(message.c_str());
+        uint32_t size = static_cast<uint32_t>(message.size());
+        
+        AzNetworking::DtlsEndpoint dtlsEndpoint;
+        AzNetworking::ConnectionQuality connectionQuality;
+        
+        int32_t bytesSent = m_udpSocket->Send(targetAddress, data, size, false, dtlsEndpoint, connectionQuality);
+        if (bytesSent <= 0)
+        {
+            AZ_Warning("UdpComponent", false, "Failed to send multicast message to %s:%d", multicastAddress.c_str(), port);
+        }
+        else
+        {
+            AZ_TracePrintf("UdpComponent", "Sent multicast %d bytes to %s:%d", bytesSent, multicastAddress.c_str(), port);
+        }
     }
 } // namespace TcpUdpGem
